@@ -1,0 +1,36 @@
+version: "3"
+
+services:
+  app:
+    build: .
+    networks:
+      - mmiv_network
+    env_file:
+      - path: ${PWD}/.env
+    environment:
+      - APP_CACHE_DATA:${APP_CACHE_DATA}
+      - APP_CACHE_ITEM_MAX:${APP_CACHE_ITEM_MAX}
+      - APP_S3_BUCKET:${APP_S3_BUCKET}
+      - APP_LOG_LEVEL:${APP_LOG_LEVEL}
+      - APP_PORT:${APP_PORT}
+      - APP_LOCAL_ONLY:${APP_LOCAL_ONLY}
+    expose:
+      - ${APP_PORT}
+    volumes:
+      - ${APP_CACHE_DIR}:/app_data_cache
+  
+  proxy:
+    image: nginx:1.24.0
+    networks:
+      - mmiv_network
+    env_file:
+      - path: ${PWD}/.env
+    ports:
+      - ${APP_PORT}:80
+    volumes:
+      - ${PWD}/nginx.conf:/etc/nginx/nginx.conf
+
+networks:
+  mmiv_network:
+    name: mmiv_services_network
+    driver: 'bridge'

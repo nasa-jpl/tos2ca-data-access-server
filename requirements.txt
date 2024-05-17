@@ -1,0 +1,5 @@
+bottle
+gunicorn
+numpy
+netCDF4
+boto3
