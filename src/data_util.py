@@ -1,5 +1,6 @@
 import os
 import json
+import time as pytime
 from json import JSONEncoder
 from collections import OrderedDict
 import numpy as np
@@ -29,6 +30,7 @@ def walktree(top):
 
 def get_plot_data(file_list=[], remove_fill=False):
     logging.info(f"Collecting plot data for: {file_list}")
+    p_start_time = pytime.time()
 
     if not isinstance(file_list, list):
         file_list = [file_list]
@@ -145,6 +147,7 @@ def get_plot_data(file_list=[], remove_fill=False):
         else:
             plotset["values"] = plotset["values"][mask]
 
+    logging.info(f"{file_list} Done. Elapsed time: {pytime.time() - p_start_time} seconds")
     return plotset
 
 
