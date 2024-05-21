@@ -48,7 +48,7 @@ def get_plot_data(file_list=[], remove_fill=False):
                             variable = child.variables[var_name]
 
                             # init variable value tracking
-                            if not var_name in varset:
+                            if var_name not in varset:
                                 varset[var_name] = {
                                     "values": np.array([]),
                                     "times": np.array([]),
@@ -57,7 +57,7 @@ def get_plot_data(file_list=[], remove_fill=False):
 
                             # add fill value and units string
                             if (
-                                not "fill_val" in varset[var_name]
+                                "fill_val" not in varset[var_name]
                                 or "units" not in varset[var_name]
                             ):
                                 try:
@@ -94,10 +94,8 @@ def get_plot_data(file_list=[], remove_fill=False):
 
                             # collect time and phenomenon id
                             (time, id) = child.path.strip("/").split("/")
-                            time_arr = new_vals.copy()
-                            time_arr.fill(int(time))
-                            id_arr = new_vals.copy()
-                            id_arr.fill(int(id))
+                            time_arr = np.full(new_vals.shape, int(time), dtype=int)
+                            id_arr = np.full(new_vals.shape, int(id), dtype=int)
                             varset[var_name]["times"] = np.concatenate(
                                 (
                                     varset[var_name]["times"],
@@ -147,7 +145,9 @@ def get_plot_data(file_list=[], remove_fill=False):
         else:
             plotset["values"] = plotset["values"][mask]
 
-    logging.info(f"{file_list} Done. Elapsed time: {pytime.time() - p_start_time} seconds")
+    logging.info(
+        f"{file_list} Done. Elapsed time: {pytime.time() - p_start_time} seconds"
+    )
     return plotset
 
 
