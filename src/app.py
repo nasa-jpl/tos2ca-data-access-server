@@ -35,6 +35,8 @@ class App:
                 Path.unlink(del_file)
 
     def get_data(self, request):
+        logging.info(f"Request: {request.url}")
+
         # check for params
         if request.query.get("files") is None:
             abort(400, "missing query parameter")
@@ -46,7 +48,16 @@ class App:
             if request.query.get("format")
             else APP_CONFIG["DEFAULT_FORMAT"]
         )
-        keep_fill = str_to_bool(request.query.get("fill"))
+        anom_ids = request.query.get("ids")
+        if anom_ids:
+            anom_ids = [int(x) for x in anom_ids.split(",")]
+        times = request.query.get("times")
+        if times:
+            times = [int(x) for x in times.split(",")]
+        area = request.query.get("area")
+        if area:
+            area = [float(x) for x in area.split(",")]
+        remove_fill = not str_to_bool(request.query.get("fill"))
 
         try:
             # download the files to our cache
@@ -55,7 +66,13 @@ class App:
             local_files = download_files(file_list)
 
             # compile all the data together
-            data = data_util.get_plot_data(local_files, remove_fill=not keep_fill)
+            data = data_util.get_plot_data(
+                file_list=local_files,
+                anomaly_ids=anom_ids,
+                times=times,
+                area=area,
+                remove_fill=remove_fill,
+            )
         except:
             traceback.print_exc()
             abort(500, "something went wrong")

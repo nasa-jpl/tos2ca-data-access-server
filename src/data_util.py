@@ -88,7 +88,9 @@ def get_data_from_file(filename):
     return varset
 
 
-def get_plot_data(file_list=[], remove_fill=False):
+def get_plot_data(
+    file_list=[], anomaly_ids=None, times=None, area=None, remove_fill=False
+):
     logging.info(f"Collecting plot data for: {file_list}")
     p_start_time = pytime.time()
 
@@ -133,20 +135,67 @@ def get_plot_data(file_list=[], remove_fill=False):
         fill_value = varset[var_name]["fill_val"]
         break  # all the lats, lons, times, IDs, and fill values should match so we just need to do this once
 
+    # init a mask for removing rows by removing None values (there should never be any)
+    mask = plotset["values"] != None
+
     # optionally remove rows that contain the fill value
     if remove_fill:
-        expected_fill = (
-            -9999.0
-        )  # TODO - figure out why there are apparently multiple fill values?
-        mask = ~(
-            np.logical_or(
-                plotset["values"] == fill_value, plotset["values"] == expected_fill
-            )
+        # TODO - figure out why there are apparently multiple fill values?
+        expected_fill = -9999.0
+
+        # add the fill values to mask
+        mask = np.logical_and(
+            mask,
+            ~(
+                np.logical_or(
+                    plotset["values"] == fill_value, plotset["values"] == expected_fill
+                )
+            ),
         )
-        if len(varset) > 1:
-            plotset["values"] = plotset["values"][np.all(mask, axis=1), :]
+
+    # filter out specific fields
+    # anomaly IDs are implicitly an 'include' set
+    if anomaly_ids:
+        # index from the right because the number of value columns is variable
+        anom_ind = -1
+        if not isinstance(anomaly_ids, list):
+            anomaly_ids = [anomaly_ids]
+        # update the mask
+        mask[:, anom_ind] = np.isin(plotset["values"][:, anom_ind], anomaly_ids)
+
+    # times are are an inclusive window int(YYYYMMDDhhmm)
+    if times:
+        # index from the right because the number of value columns is variable
+        time_ind = -2
+        if not isinstance(times, list):
+            times = [times]
+        # if only one time is given, assume its the min time
+        if len(times) < 2:
+            times.append(999999999999)  # impossible but large 12 char "date"
+        # update the mask
+        mask[:, time_ind] = np.ma.masked_inside(
+            plotset["values"][:, time_ind], times[0], times[1]
+        ).mask
+
+    # area is inclusive within [min_lon(x), min_lat(y), max_lon(x), max_lat(y)]
+    if area:
+        # index from the right because the number of value columns is variable
+        lon_ind = -3
+        lat_ind = -4
+        if isinstance(area, list) and len(area) == 4:
+            # update the mask
+            mask[:, lon_ind] = np.ma.masked_inside(
+                plotset["values"][:, lon_ind], area[0], area[2]
+            ).mask
+            mask[:, lat_ind] = np.ma.masked_inside(
+                plotset["values"][:, lat_ind], area[1], area[3]
+            ).mask
         else:
-            plotset["values"] = plotset["values"][mask]
+            # no way to correct poor formatting
+            logging.warn(f"Improper bounding box format: {area}")
+
+    # apply mask
+    plotset["values"] = plotset["values"][np.all(mask, axis=1), :]
 
     logging.info(
         f"{file_list} Done. Elapsed time: {pytime.time() - p_start_time} seconds"
