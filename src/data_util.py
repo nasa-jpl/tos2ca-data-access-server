@@ -5,6 +5,7 @@ from json import JSONEncoder
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 import numpy as np
+import pandas as pd
 from netCDF4 import Dataset, default_fillvals
 import logging
 
@@ -13,12 +14,8 @@ from misc_util import to_title
 
 class NumpyArrayEncoder(JSONEncoder):
     def default(self, obj):
-        if isinstance(obj, np.integer):
-            return int(obj)
-        elif isinstance(obj, np.floating):
-            return float(obj)
-        elif isinstance(obj, np.ndarray):
-            return obj.tolist()
+        if isinstance(obj, pd.DataFrame):
+            return obj.to_json(orient="values")
         else:
             return super(NumpyArrayEncoder, self).default(obj)
 
@@ -125,15 +122,20 @@ def get_plot_data(
     # stack in the lat, lon, time, and phenom ids and pull fill value
     fill_value = None
     for var_name in varset:
-        lat_lon = varset[var_name]["values"][:, :2]  # grab the first two columns
+        # grab the first two columns data format is [lat, long, value]
+        lat_lon = varset[var_name]["values"][:, :2]
         plotset["values"] = np.c_[
             plotset["values"],
             lat_lon,
             varset[var_name]["times"],
             varset[var_name]["phenom_ids"],
         ]
+
+        # grab the fill value
         fill_value = varset[var_name]["fill_val"]
-        break  # all the lats, lons, times, IDs, and fill values should match so we just need to do this once
+        
+        # all the lats, lons, times, IDs, and fill values should match so we just need to do this once
+        break
 
     # init a mask for removing rows by removing None values (there should never be any)
     mask = plotset["values"] != None
@@ -204,4 +206,9 @@ def get_plot_data(
 
 
 def dump_plot_data(plotData):
-    return json.dumps(plotData, cls=NumpyArrayEncoder)
+    p_start_time = pytime.time()
+    # convert values to a Pandas DataFrame because json serializing is so much faster
+    plotData["values"] = pd.DataFrame(plotData["values"]) 
+    plot_data = json.dumps(plotData, cls=NumpyArrayEncoder)
+    logging.info(f"dumped data to json: {pytime.time() - p_start_time} seconds")
+    return plot_data
