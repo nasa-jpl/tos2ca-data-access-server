@@ -1,7 +1,6 @@
 import os
 import json
 import time as pytime
-from json import JSONEncoder
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 import numpy as np
