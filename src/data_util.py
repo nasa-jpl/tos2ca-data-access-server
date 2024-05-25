@@ -12,14 +12,6 @@ import logging
 from misc_util import to_title
 
 
-class NumpyArrayEncoder(JSONEncoder):
-    def encode(self, obj):
-        if isinstance(obj, pd.DataFrame):
-            return obj.to_json(orient="values")
-        else:
-            return super(NumpyArrayEncoder, self).encode(obj)
-
-
 def walktree(top):
     yield top.groups.values()
     for value in top.groups.values():
