@@ -209,6 +209,7 @@ def dump_plot_data(plotData):
     p_start_time = pytime.time()
 
     # convert values to a Pandas DataFrame because json serializing is so much faster
+    # TODO - convert to DataFrames during data aggregation for better filtering performance
     plot_vals = pd.DataFrame(plotData["values"])
 
     # remove values from data for serializing
