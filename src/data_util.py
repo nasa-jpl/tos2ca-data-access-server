@@ -13,11 +13,11 @@ from misc_util import to_title
 
 
 class NumpyArrayEncoder(JSONEncoder):
-    def default(self, obj):
+    def encode(self, obj):
         if isinstance(obj, pd.DataFrame):
             return obj.to_json(orient="values")
         else:
-            return super(NumpyArrayEncoder, self).default(obj)
+            return super(NumpyArrayEncoder, self).encode(obj)
 
 
 def walktree(top):
@@ -133,7 +133,7 @@ def get_plot_data(
 
         # grab the fill value
         fill_value = varset[var_name]["fill_val"]
-        
+
         # all the lats, lons, times, IDs, and fill values should match so we just need to do this once
         break
 
@@ -207,8 +207,22 @@ def get_plot_data(
 
 def dump_plot_data(plotData):
     p_start_time = pytime.time()
+
     # convert values to a Pandas DataFrame because json serializing is so much faster
-    plotData["values"] = pd.DataFrame(plotData["values"]) 
-    plot_data = json.dumps(plotData, cls=NumpyArrayEncoder)
+    plot_vals = pd.DataFrame(plotData["values"])
+
+    # remove values from data for serializing
+    plotData.pop("values", None)
+
+    # get basic data string
+    plot_data_str = json.dumps(plotData)
+
+    # get data array as string
+    vals_str = plot_vals.to_json(orient="values")
+
+    # splice the values into the return string
+    json_str = plot_data_str[:-1] + ',"values":' + vals_str + plot_data_str[-1:]
+
     logging.info(f"dumped data to json: {pytime.time() - p_start_time} seconds")
-    return plot_data
+
+    return json_str
