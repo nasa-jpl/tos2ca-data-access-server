@@ -1,7 +1,7 @@
 version: "3"
 
 services:
-  app:
+  data_access_server_app:
     build: .
     networks:
       - app_network
@@ -19,7 +19,7 @@ services:
     volumes:
       - ${APP_CACHE_DIR}:/app_data_cache
   
-  proxy:
+  data_access_server_proxy:
     image: nginx:1.24.0
     networks:
       - app_network
