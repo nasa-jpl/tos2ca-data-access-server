@@ -1,5 +1,5 @@
 # FROM ubuntu:16.04
-FROM python:3.10-bullseye
+FROM python:3.9
 
 RUN apt-get -y update
 
