@@ -8,7 +8,7 @@ def bool_env(env_str):
 
 
 APP_CONFIG = {
-    "S3_BUCKET": os.getenv("APP_S3_BUCKET", "tos2ca-dev1"),
+    "S3_BUCKET": os.getenv("APP_S3_BUCKET", "yourbucket"),
     "CACHE_DIR": os.path.abspath("/app_data_cache"),
     "MAX_CACHE": int(os.getenv("APP_CACHE_ITEM_MAX", 15)),  # number of items
     "CACHE_FILES": bool_env("APP_CACHE_DATA"),
