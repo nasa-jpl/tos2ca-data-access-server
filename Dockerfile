@@ -1,16 +1,10 @@
 # FROM ubuntu:16.04
-FROM python:3.9
+FROM python:3.12
 
-RUN addgroup appgroup
-RUN adduser --disabled-password --home '/home/appuser' --ingroup appgroup appuser
-
-USER appuser
+# RUN apt-get -y update
 
 RUN mkdir /app
 WORKDIR /app
-RUN chown -R appuser:appuser /app
-
-# RUN apt-get -y update
 
 COPY ./src /app
 COPY ./requirements.txt ./app/requirements.txt

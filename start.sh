@@ -5,15 +5,6 @@ set -a
 source .env
 set +a
 
-echo "pulling containers"
-docker pull nginx:1.24.0
-
-echo "building containers"
-docker build -t data_access_server .
-
-echo "creating network"
-docker network create -d bridge app_services_network
-
 echo "starting containers"
 docker run -d \
     -e APP_CACHE_DATA=${APP_CACHE_DATA} \
@@ -30,6 +21,7 @@ docker run -d \
 
 echo "pausing..."
 sleep 5
+
 docker run -d \
     -p ${APP_PORT}:80 \
     -v ${APP_NGINX_CONF}:/etc/nginx/nginx.conf:ro \
