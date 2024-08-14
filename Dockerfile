@@ -8,7 +8,7 @@ USER appuser
 
 RUN mkdir /app
 WORKDIR /app
-RUN chown appuser:appuser -R /app
+RUN chown -R appuser:appuser /app
 
 # RUN apt-get -y update
 
