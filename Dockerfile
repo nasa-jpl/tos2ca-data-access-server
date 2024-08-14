@@ -7,7 +7,7 @@ RUN mkdir /app
 WORKDIR /app
 
 COPY ./src /app
-COPY ./requirements.txt ./app/requirements.txt
+COPY ./requirements.txt ./requirements.txt
 RUN pip install -r requirements.txt
 
 CMD ["python", "./server.py"]
