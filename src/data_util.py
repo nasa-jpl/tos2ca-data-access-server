@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from netCDF4 import Dataset, default_fillvals
 import logging
+from deepmerge import always_merger
 
 from misc_util import to_title
 
@@ -19,6 +20,7 @@ def walktree(top):
 
 def get_data_from_file(filename):
     varset = OrderedDict()
+    statset = OrderedDict()
 
     if os.path.isfile(filename):
         nc = Dataset(filename)
@@ -31,8 +33,10 @@ def get_data_from_file(filename):
 
                         # collect time and phenomenon id into arrays
                         (time, id) = child.path.strip("/").split("/")
-                        time_arr = np.full(len(variable), int(time), dtype=int)
-                        id_arr = np.full(len(variable), int(id), dtype=int)
+                        time = int(time)
+                        id = int(id)
+                        time_arr = np.full(len(variable), time, dtype=int)
+                        id_arr = np.full(len(variable), id, dtype=int)
 
                         # init accumulator
                         if var_name not in varset:
@@ -70,11 +74,32 @@ def get_data_from_file(filename):
                                     id_arr,
                                 )
                             )
+
+                        # collect stats info
+                        summ_stats = {
+                            "min": float(variable.Min),
+                            "max": float(variable.Max),
+                            "mean": float(variable.Mean),
+                            "std_dev": float(variable.Std_dev),
+                            "percentile_10": float(variable.percentile_10),
+                            "percentile_25": float(variable.percentile_25),
+                            "percentile_50": float(variable.percentile_50),
+                            "percentile_75": float(variable.percentile_75),
+                            "percentile_90": float(variable.percentile_90),
+                        }
+
+                        # init accumulator
+                        if var_name not in statset:
+                            statset[var_name] = {}
+                            statset[var_name][time] = {}
+                        else:
+                            if time not in statset[var_name]:
+                                statset[var_name][time] = {}
+                        statset[var_name][time][id] = {var_name: summ_stats}
     else:
         logging.error(f"{filename} is not a file")
 
-    return varset
-
+    return (varset, statset)
 
 def get_plot_data(
     file_list=[], anomaly_ids=None, times=None, area=None, remove_fill=False
@@ -94,10 +119,13 @@ def get_plot_data(
     # collapse all the file contents into a single dict for ease
     varset = OrderedDict()
     for dataset in datasets:
-        for varname in dataset:
-            varset[varname] = dataset[varname]
+        (vset, sset) = dataset
+        for varname in vset:
+            varset[varname] = vset[varname]
+            varset[varname]["stats"] = sset[varname]
 
     # stack all the variable values together into a single nD array
+    # TODO - restack stats so its time:id:var:stats
     plotset = {}
     for var_name in varset:
         vals = varset[var_name]["values"][:, 2]  # grab the value column
@@ -105,10 +133,19 @@ def get_plot_data(
             plotset["title"] = to_title(var_name)
             plotset["values"] = vals
             plotset["axis_labels"] = [f'{var_name} ({varset[var_name]["units"]})']
+            plotset["stats"] = [
+                {"time": time, "stats": varset[var_name]["stats"][time]}
+                for time in varset[var_name]["stats"]
+            ]
         else:
             plotset["title"] = f'{plotset["title"]} x {to_title(var_name)}'
             plotset["values"] = np.c_[plotset["values"], vals]
             plotset["axis_labels"].append(f'{var_name} ({varset[var_name]["units"]})')
+            for idx, time in enumerate(varset[var_name]["stats"]):
+                if plotset["stats"][idx]["time"] == time:
+                    plotset["stats"][idx]["stats"] = always_merger.merge(plotset["stats"][idx]["stats"], varset[var_name]['stats'][time])
+                else:
+                    logging.error("mismatch in time order, stats not collected")
 
     # stack in the lat, lon, time, and phenom ids and pull fill value
     fill_value = None
