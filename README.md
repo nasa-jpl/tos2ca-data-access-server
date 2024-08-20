@@ -1,4 +1,4 @@
-# TOS2CA Data Access Server
+# Data Access Server
 
 The ``data-access-server`` library is part of the of the TOS2CA Project. For more information, visit the TOS2CA website at [https://nasa-jpl.github.io/tos2ca-documentation/](https://nasa-jpl.github.io/tos2ca-documentation/).
 
