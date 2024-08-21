@@ -15,7 +15,6 @@ docker run -d \
     -e APP_LOCAL_ONLY=${APP_LOCAL_ONLY} \
     -v ${APP_CACHE_DIR}:/app_data_cache \
     --expose ${APP_PORT} \
-    --network app_services_network \
     --name data_access_server_app \
     data_access_server
 
@@ -24,7 +23,6 @@ sleep 5
 
 docker run -d \
     -p ${APP_PORT}:80 \
-    -v ${APP_NGINX_CONF}:/etc/nginx/nginx.conf:ro \
-    --network app_services_network \
+    -v ${APP_NGINX_CONF}:/etc/nginx/nginx.conf \
     --name data_access_server_proxy \
     nginx:1.24.0
