@@ -14,14 +14,15 @@ docker run -d \
     -e APP_PORT=${APP_PORT} \
     -e APP_LOCAL_ONLY=${APP_LOCAL_ONLY} \
     -v ${APP_CACHE_DIR}:/app_data_cache \
-    --expose ${APP_PORT} \
+    # --expose ${APP_PORT} \
+    --p ${APP_PORT}:${APP_PORT} \
     --name data_access_server_app \
     tos2ca_data_access_server_app
 
-echo "pausing..."
-sleep 5
+# echo "pausing..."
+# sleep 5
 
-docker run -d \
-    -p ${APP_PORT}:80 \
-    --name data_access_server_proxy \
-    tos2ca_data_access_server_proxy
+# docker run -d \
+#     -p ${APP_PORT}:80 \
+#     --name data_access_server_proxy \
+#     tos2ca_data_access_server_proxy
