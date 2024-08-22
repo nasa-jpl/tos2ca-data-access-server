@@ -1,7 +1,7 @@
 # FROM ubuntu:16.04
 FROM python:3.12
 
-# RUN apt-get -y update
+RUN apt-get -y update
 
 RUN mkdir /app
 WORKDIR /app

@@ -16,7 +16,7 @@ docker run -d \
     -v ${APP_CACHE_DIR}:/app_data_cache \
     --expose ${APP_PORT} \
     --name data_access_server_app \
-    data_access_server_app
+    tos2ca_data_access_server_app
 
 echo "pausing..."
 sleep 5
@@ -24,4 +24,4 @@ sleep 5
 docker run -d \
     -p ${APP_PORT}:80 \
     --name data_access_server_proxy \
-    data_access_server_proxy
+    tos2ca_data_access_server_proxy
