@@ -2,7 +2,9 @@ version: "3"
 
 services:
   data_access_server_app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile.app
     networks:
       - app_network
     env_file:
@@ -20,15 +22,15 @@ services:
       - ${APP_CACHE_DIR}:/app_data_cache
   
   data_access_server_proxy:
-    image: nginx:1.24.0
+    build:
+      context: .
+      dockerfile: Dockerfile.proxy
     networks:
       - app_network
     env_file:
       - path: ${PWD}/.env
     ports:
       - ${APP_PORT}:80
-    volumes:
-      - ${PWD}/nginx.conf:/etc/nginx/nginx.conf
 
 networks:
   app_network:
