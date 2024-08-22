@@ -16,13 +16,12 @@ docker run -d \
     -v ${APP_CACHE_DIR}:/app_data_cache \
     --expose ${APP_PORT} \
     --name data_access_server_app \
-    data_access_server
+    data_access_server_app
 
 echo "pausing..."
 sleep 5
 
 docker run -d \
     -p ${APP_PORT}:80 \
-    -v ${APP_NGINX_CONF}:/etc/nginx/nginx.conf \
     --name data_access_server_proxy \
-    nginx:1.24.0
+    data_access_server_proxy

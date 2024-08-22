@@ -1,8 +1,8 @@
 echo "pulling containers"
-docker pull nginx:1.24.0
+docker build -t data_access_server_proxy -f Dockerfile.proxy .
 
 echo "building containers"
-docker build -t data_access_server .
+docker build -t data_access_server_app -f Dockerfile.app .
 
 # echo "creating network"
 # docker network create -d bridge app_services_network
