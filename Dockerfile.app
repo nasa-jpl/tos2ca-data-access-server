@@ -10,4 +10,6 @@ COPY ./src /app
 COPY ./requirements.txt ./requirements.txt
 RUN pip install -r requirements.txt
 
+ENV HDF5_USE_FILE_LOCKING=FALSE
+
 CMD ["python", "./server.py"]

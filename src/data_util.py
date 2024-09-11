@@ -2,7 +2,7 @@ import os
 import json
 import time as pytime
 from collections import OrderedDict
-from concurrent.futures import ThreadPoolExecutor
+from multiprocessing import pool as mp_pool
 import numpy as np
 import pandas as pd
 from netCDF4 import Dataset, default_fillvals
@@ -10,6 +10,9 @@ import logging
 from deepmerge import always_merger
 
 from misc_util import to_title
+
+# hacky variable that will increment every time we read a file
+READ_COUNTER = 0
 
 
 def walktree(top):
@@ -19,11 +22,22 @@ def walktree(top):
 
 
 def get_data_from_file(filename):
+    global READ_COUNTER
+
+    READ_COUNTER += 1
+
     varset = OrderedDict()
     statset = OrderedDict()
 
     if os.path.isfile(filename):
-        nc = Dataset(filename)
+        logging.info(f"Reading data from: {filename}")
+
+        # artificial delay to avoid concurrency issues
+        if READ_COUNTER % 2 == 0:
+            pytime.sleep(1)
+
+        nc = Dataset(filename, format="NETCDF4")
+        logging.info(f"Processing data: {filename}")
         nc.set_auto_mask(False)
         for children in walktree(nc):
             for child in children:
@@ -101,6 +115,7 @@ def get_data_from_file(filename):
 
     return (varset, statset)
 
+
 def get_plot_data(
     file_list=[], anomaly_ids=None, times=None, area=None, remove_fill=False
 ):
@@ -112,9 +127,9 @@ def get_plot_data(
 
     # multi-thread the data collection
     datasets = []
-    with ThreadPoolExecutor(max_workers=10) as executor:
-        for i in executor.map(get_data_from_file, file_list):
-            datasets.append(i)
+    with mp_pool.Pool() as process_pool:
+        for result in process_pool.map(get_data_from_file, file_list):
+            datasets.append(result)
 
     # collapse all the file contents into a single dict for ease
     varset = OrderedDict()
@@ -143,7 +158,9 @@ def get_plot_data(
             plotset["axis_labels"].append(f'{var_name} ({varset[var_name]["units"]})')
             for idx, time in enumerate(varset[var_name]["stats"]):
                 if plotset["stats"][idx]["time"] == time:
-                    plotset["stats"][idx]["stats"] = always_merger.merge(plotset["stats"][idx]["stats"], varset[var_name]['stats'][time])
+                    plotset["stats"][idx]["stats"] = always_merger.merge(
+                        plotset["stats"][idx]["stats"], varset[var_name]["stats"][time]
+                    )
                 else:
                     logging.error("mismatch in time order, stats not collected")
 
