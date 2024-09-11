@@ -8,7 +8,7 @@ services:
     networks:
       - app_network
     env_file:
-      - path: ./.env
+      - path: .env
     environment:
       - APP_CACHE_DATA:${APP_CACHE_DATA}
       - APP_CACHE_ITEM_MAX:${APP_CACHE_ITEM_MAX}
@@ -30,7 +30,7 @@ services:
     networks:
       - app_network
     env_file:
-      - path: ./.env
+      - path: .env
     ports:
       - ${APP_PORT}:80
 
