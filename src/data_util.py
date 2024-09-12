@@ -11,9 +11,6 @@ from deepmerge import always_merger
 
 from misc_util import to_title
 
-# hacky variable that will increment every time we read a file
-READ_COUNTER = 0
-
 
 def walktree(top):
     yield top.groups.values()
@@ -22,22 +19,12 @@ def walktree(top):
 
 
 def get_data_from_file(filename):
-    global READ_COUNTER
-
-    READ_COUNTER += 1
-
     varset = OrderedDict()
     statset = OrderedDict()
 
     if os.path.isfile(filename):
-        logging.info(f"Reading data from: {filename}")
-
-        # artificial delay to avoid concurrency issues
-        if READ_COUNTER % 2 == 0:
-            pytime.sleep(1)
-
+        logging.info(f"Processing data from: {filename}")
         nc = Dataset(filename, format="NETCDF4")
-        logging.info(f"Processing data: {filename}")
         nc.set_auto_mask(False)
         for children in walktree(nc):
             for child in children:
