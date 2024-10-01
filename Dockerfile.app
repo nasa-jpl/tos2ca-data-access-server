@@ -6,9 +6,10 @@ RUN apt-get -y update
 RUN mkdir /app
 WORKDIR /app
 
-COPY ./src /app
 COPY ./requirements.txt ./requirements.txt
 RUN pip install -r requirements.txt
+
+COPY ./src /app
 
 ENV HDF5_USE_FILE_LOCKING=FALSE
 

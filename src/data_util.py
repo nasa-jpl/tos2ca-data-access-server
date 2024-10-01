@@ -2,6 +2,7 @@ import os
 import json
 import time as pytime
 from collections import OrderedDict
+from functools import partial
 from multiprocessing import pool as mp_pool
 import numpy as np
 import pandas as pd
@@ -18,7 +19,7 @@ def walktree(top):
         yield from walktree(value)
 
 
-def get_data_from_file(filename):
+def get_data_from_file(filename, anomaly_ids=None, times=None):
     varset = OrderedDict()
     statset = OrderedDict()
 
@@ -36,6 +37,13 @@ def get_data_from_file(filename):
                         (time, id) = child.path.strip("/").split("/")
                         time = int(time)
                         id = int(id)
+
+                        # skip if this isn't in the include set of filters
+                        if (anomaly_ids and id not in anomaly_ids) or (
+                            times and (time < times[0] or time > times[1])
+                        ):
+                            continue
+
                         time_arr = np.full(len(variable), time, dtype=int)
                         id_arr = np.full(len(variable), id, dtype=int)
 
@@ -77,17 +85,17 @@ def get_data_from_file(filename):
                             )
 
                         # collect stats info
-                        summ_stats = {
-                            "min": float(variable.Min),
-                            "max": float(variable.Max),
-                            "mean": float(variable.Mean),
-                            "std_dev": float(variable.Std_dev),
-                            "percentile_10": float(variable.percentile_10),
-                            "percentile_25": float(variable.percentile_25),
-                            "percentile_50": float(variable.percentile_50),
-                            "percentile_75": float(variable.percentile_75),
-                            "percentile_90": float(variable.percentile_90),
-                        }
+                        try:
+                            summ_stats = {
+                                "min": float(variable.Min),
+                                "max": float(variable.Max),
+                                "mean": float(variable.Mean),
+                                "std_dev": float(variable.Std_dev),
+                            }
+                        except AttributeError:
+                            logging.warning(
+                                f"Failed to retrieve statistics from: {filename}/{var_name}/{time}/{id}"
+                            )
 
                         # init accumulator
                         if var_name not in statset:
@@ -112,10 +120,23 @@ def get_plot_data(
     if not isinstance(file_list, list):
         file_list = [file_list]
 
-    # multi-thread the data collection
+    # filters are implicitly an 'include' set
+    anomaly_ids = (
+        []
+        if not anomaly_ids
+        else anomaly_ids if isinstance(anomaly_ids, list) else [anomaly_ids]
+    )
+    if times:
+        if not isinstance(times, list):
+            times = [times]
+        # if only one time is given, assume its the min time
+        if len(times) < 2:
+            times.append(999999999999)  # impossible but large 12 char "date"
+
+    # parallelize the data collection
     datasets = []
     with mp_pool.Pool() as process_pool:
-        for result in process_pool.map(get_data_from_file, file_list):
+        for result in process_pool.map(partial(get_data_from_file, anomaly_ids=anomaly_ids, times=times), file_list):
             datasets.append(result)
 
     # collapse all the file contents into a single dict for ease
@@ -127,7 +148,6 @@ def get_plot_data(
             varset[varname]["stats"] = sset[varname]
 
     # stack all the variable values together into a single nD array
-    # TODO - restack stats so its time:id:var:stats
     plotset = {}
     for var_name in varset:
         vals = varset[var_name]["values"][:, 2]  # grab the value column
@@ -135,21 +155,12 @@ def get_plot_data(
             plotset["title"] = to_title(var_name)
             plotset["values"] = vals
             plotset["axis_labels"] = [f'{var_name} ({varset[var_name]["units"]})']
-            plotset["stats"] = [
-                {"time": time, "stats": varset[var_name]["stats"][time]}
-                for time in varset[var_name]["stats"]
-            ]
+            plotset["var_list"] = [var_name]
         else:
             plotset["title"] = f'{plotset["title"]} x {to_title(var_name)}'
             plotset["values"] = np.c_[plotset["values"], vals]
             plotset["axis_labels"].append(f'{var_name} ({varset[var_name]["units"]})')
-            for idx, time in enumerate(varset[var_name]["stats"]):
-                if plotset["stats"][idx]["time"] == time:
-                    plotset["stats"][idx]["stats"] = always_merger.merge(
-                        plotset["stats"][idx]["stats"], varset[var_name]["stats"][time]
-                    )
-                else:
-                    logging.error("mismatch in time order, stats not collected")
+            plotset["var_list"].append(var_name)
 
     # stack in the lat, lon, time, and phenom ids and pull fill value
     fill_value = None
@@ -169,6 +180,45 @@ def get_plot_data(
         # all the lats, lons, times, IDs, and fill values should match so we just need to do this once
         break
 
+    # stack the stats together into wide table
+    time_arr = sorted(list(set(plotset["values"][:, -2])))
+    anom_id_arr = sorted(list(set(plotset["values"][:, -1])))
+
+    # build list of column names
+    stats_columns = ["datetime"]
+    for var_name in varset:
+        for anom_id in anom_id_arr:
+            stats_columns = stats_columns + [
+                f"{int(anom_id)}_{var_name}_min",
+                f"{int(anom_id)}_{var_name}_max",
+                f"{int(anom_id)}_{var_name}_mean",
+                f"{int(anom_id)}_{var_name}_std_dev",
+            ]
+
+    # init empty entry
+    empty_cols = [None, None, None, None]
+
+    # build rows of stats data
+    stats_rows = []
+    for time in time_arr:
+        row = [time]
+        for anom_id in anom_id_arr:
+            for var_name in varset:
+                if anom_id in varset[var_name]["stats"][time]:
+                    entry = varset[var_name]["stats"][time][anom_id][var_name]
+                    row = row + [
+                        entry["min"],
+                        entry["max"],
+                        entry["mean"],
+                        entry["std_dev"],
+                    ]
+                else:
+                    row = row + empty_cols
+        stats_rows.append(row)
+
+    plotset["stats"] = {"columns": stats_columns, "rows": stats_rows}
+
+    # Mask out plot values
     # init a mask for removing rows by removing None values (there should never be any)
     mask = plotset["values"] != None
 
@@ -187,30 +237,6 @@ def get_plot_data(
             ),
         )
 
-    # filter out specific fields
-    # anomaly IDs are implicitly an 'include' set
-    if anomaly_ids:
-        # index from the right because the number of value columns is variable
-        anom_ind = -1
-        if not isinstance(anomaly_ids, list):
-            anomaly_ids = [anomaly_ids]
-        # update the mask
-        mask[:, anom_ind] = np.isin(plotset["values"][:, anom_ind], anomaly_ids)
-
-    # times are are an inclusive window int(YYYYMMDDhhmm)
-    if times:
-        # index from the right because the number of value columns is variable
-        time_ind = -2
-        if not isinstance(times, list):
-            times = [times]
-        # if only one time is given, assume its the min time
-        if len(times) < 2:
-            times.append(999999999999)  # impossible but large 12 char "date"
-        # update the mask
-        mask[:, time_ind] = np.ma.masked_inside(
-            plotset["values"][:, time_ind], times[0], times[1]
-        ).mask
-
     # area is inclusive within [min_lon(x), min_lat(y), max_lon(x), max_lat(y)]
     if area:
         # index from the right because the number of value columns is variable
@@ -226,7 +252,7 @@ def get_plot_data(
             ).mask
         else:
             # no way to correct poor formatting
-            logging.warn(f"Improper bounding box format: {area}")
+            logging.warning(f"Improper bounding box format: {area}")
 
     # apply mask
     plotset["values"] = plotset["values"][np.all(mask, axis=1), :]
@@ -243,18 +269,24 @@ def dump_plot_data(plotData):
     # convert values to a Pandas DataFrame because json serializing is so much faster
     # TODO - convert to DataFrames during data aggregation for better filtering performance
     plot_vals = pd.DataFrame(plotData["values"])
+    stats_vals = pd.DataFrame(plotData["stats"]["rows"])
+    stats_headers = plotData["stats"]["columns"]
 
     # remove values from data for serializing
     plotData.pop("values", None)
+    plotData.pop("stats", None)
 
     # get basic data string
     plot_data_str = json.dumps(plotData)
 
     # get data array as string
     vals_str = plot_vals.to_json(orient="values")
+    stats_vals_str = stats_vals.to_json(orient="values")
+
+    stats_sub_str = '"stats": {"rows":' + stats_vals_str + ',"columns":' + json.dumps(stats_headers) + '}'
 
     # splice the values into the return string
-    json_str = plot_data_str[:-1] + ',"values":' + vals_str + plot_data_str[-1:]
+    json_str = plot_data_str[:-1] + ',"values":' + vals_str +  ',' + stats_sub_str + plot_data_str[-1:]
 
     logging.info(f"dumped data to json: {pytime.time() - p_start_time} seconds")
 
