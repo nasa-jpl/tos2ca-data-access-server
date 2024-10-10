@@ -19,7 +19,7 @@ def walktree(top):
         yield from walktree(value)
 
 
-def get_data_from_file(filename, anomaly_ids=None, times=None):
+def get_data_from_file(filename, times=None):
     varset = OrderedDict()
     statset = OrderedDict()
 
@@ -39,9 +39,7 @@ def get_data_from_file(filename, anomaly_ids=None, times=None):
                         id = int(id)
 
                         # skip if this isn't in the include set of filters
-                        if (anomaly_ids and id not in anomaly_ids) or (
-                            times and (time < times[0] or time > times[1])
-                        ):
+                        if times and (time < times[0] or time > times[1]):
                             continue
 
                         time_arr = np.full(len(variable), time, dtype=int)
@@ -136,7 +134,9 @@ def get_plot_data(
     # parallelize the data collection
     datasets = []
     with mp_pool.Pool() as process_pool:
-        for result in process_pool.map(partial(get_data_from_file, anomaly_ids=anomaly_ids, times=times), file_list):
+        for result in process_pool.map(
+            partial(get_data_from_file, times=times), file_list
+        ):
             datasets.append(result)
 
     # collapse all the file contents into a single dict for ease
@@ -185,24 +185,20 @@ def get_plot_data(
     anom_id_arr = sorted(list(set(plotset["values"][:, -1])))
 
     # build list of column names
-    stats_columns = ["datetime"]
+    stats_columns = ["datetime", "anom_id"]
     for var_name in varset:
-        for anom_id in anom_id_arr:
-            stats_columns = stats_columns + [
-                f"{int(anom_id)}_{var_name}_min",
-                f"{int(anom_id)}_{var_name}_max",
-                f"{int(anom_id)}_{var_name}_mean",
-                f"{int(anom_id)}_{var_name}_std_dev",
-            ]
-
-    # init empty entry
-    empty_cols = [None, None, None, None]
+        stats_columns = stats_columns + [
+            f"{var_name}_min",
+            f"{var_name}_max",
+            f"{var_name}_mean",
+            f"{var_name}_std_dev",
+        ]
 
     # build rows of stats data
     stats_rows = []
     for time in time_arr:
-        row = [time]
         for anom_id in anom_id_arr:
+            row = [time, anom_id]
             for var_name in varset:
                 if anom_id in varset[var_name]["stats"][time]:
                     entry = varset[var_name]["stats"][time][anom_id][var_name]
@@ -212,15 +208,15 @@ def get_plot_data(
                         entry["mean"],
                         entry["std_dev"],
                     ]
-                else:
-                    row = row + empty_cols
-        stats_rows.append(row)
+            stats_rows.append(row)
+    plotset["stats"] = {"columns": stats_columns, "rows": pd.DataFrame(stats_rows, columns=stats_columns).dropna()}
 
-    plotset["stats"] = {"columns": stats_columns, "rows": stats_rows}
+    mask_start_time = pytime.time()
 
     # Mask out plot values
-    # init a mask for removing rows by removing None values (there should never be any)
+    # init a mask for removing rows by removing None values
     mask = plotset["values"] != None
+    stats_mask = None
 
     # optionally remove rows that contain the fill value
     if remove_fill:
@@ -237,28 +233,46 @@ def get_plot_data(
             ),
         )
 
+    # index from the right because the number of value columns is variable
+    anom_ind = -1
+    lon_ind = -3
+    lat_ind = -4
+
     # area is inclusive within [min_lon(x), min_lat(y), max_lon(x), max_lat(y)]
+    # includes all points for all anomalies that intersect the bounds
     if area:
-        # index from the right because the number of value columns is variable
-        lon_ind = -3
-        lat_ind = -4
         if isinstance(area, list) and len(area) == 4:
-            # update the mask
-            mask[:, lon_ind] = np.ma.masked_inside(
+            tmp_mask = mask.copy()
+
+            # mask to only values within the specified bounds
+            tmp_mask[:, lon_ind] = np.ma.masked_inside(
                 plotset["values"][:, lon_ind], area[0], area[2]
             ).mask
-            mask[:, lat_ind] = np.ma.masked_inside(
+            tmp_mask[:, lat_ind] = np.ma.masked_inside(
                 plotset["values"][:, lat_ind], area[1], area[3]
             ).mask
+
+            # find the set of unique anomaly IDs within those bounds
+            # add them to set manually specified in the request
+            filtered_values = plotset["values"][np.all(tmp_mask, axis=1), :]
+            filtered_anom_ids = np.unique(filtered_values[:, anom_ind])
+            anomaly_ids = np.concatenate((anomaly_ids, filtered_anom_ids))
         else:
             # no way to correct poor formatting
             logging.warning(f"Improper bounding box format: {area}")
 
-    # apply mask
+    # anomaly ids is a list of anomalies to include
+    if anomaly_ids and len(anomaly_ids) > 0:
+        mask[:, anom_ind] = np.isin(plotset["values"][:, anom_ind], anomaly_ids)
+        stats_mask = plotset["stats"]["rows"]["anom_id"].isin(anomaly_ids)
+
+    # apply mask to values
     plotset["values"] = plotset["values"][np.all(mask, axis=1), :]
+    if stats_mask is not None:
+        plotset["stats"]["rows"] = plotset["stats"]["rows"][stats_mask]
 
     logging.info(
-        f"{file_list} Done. Elapsed time: {pytime.time() - p_start_time} seconds"
+        f"{file_list} Done. Elapsed time: {pytime.time() - p_start_time} seconds (masking: {pytime.time() - mask_start_time} seconds)"
     )
     return plotset
 
@@ -269,7 +283,7 @@ def dump_plot_data(plotData):
     # convert values to a Pandas DataFrame because json serializing is so much faster
     # TODO - convert to DataFrames during data aggregation for better filtering performance
     plot_vals = pd.DataFrame(plotData["values"])
-    stats_vals = pd.DataFrame(plotData["stats"]["rows"])
+    stats_vals = plotData["stats"]["rows"]
     stats_headers = plotData["stats"]["columns"]
 
     # remove values from data for serializing
@@ -283,10 +297,23 @@ def dump_plot_data(plotData):
     vals_str = plot_vals.to_json(orient="values")
     stats_vals_str = stats_vals.to_json(orient="values")
 
-    stats_sub_str = '"stats": {"rows":' + stats_vals_str + ',"columns":' + json.dumps(stats_headers) + '}'
+    stats_sub_str = (
+        '"stats": {"rows":'
+        + stats_vals_str
+        + ',"columns":'
+        + json.dumps(stats_headers)
+        + "}"
+    )
 
     # splice the values into the return string
-    json_str = plot_data_str[:-1] + ',"values":' + vals_str +  ',' + stats_sub_str + plot_data_str[-1:]
+    json_str = (
+        plot_data_str[:-1]
+        + ',"values":'
+        + vals_str
+        + ","
+        + stats_sub_str
+        + plot_data_str[-1:]
+    )
 
     logging.info(f"dumped data to json: {pytime.time() - p_start_time} seconds")
 
