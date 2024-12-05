@@ -5,6 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.app
+      network: host
     networks:
       - app_network
     env_file:
@@ -25,6 +26,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.proxy
+      network: host
       args:
         - NGINX_CONF=${APP_NGINX_CONF}
     networks:
