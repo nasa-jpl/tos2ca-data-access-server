@@ -29,8 +29,8 @@ def get_data():
 
     # check for status query
     if request.query.get("status") is not None:
-        return ({"status": "running"}, "application/json")
-
+        response.content_type = "application/json"
+        return {"status": "running"}
 
     (data, output_format) = dataApp.get_data(request)
     response.content_type = output_format
