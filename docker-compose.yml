@@ -6,8 +6,6 @@ services:
       context: .
       dockerfile: Dockerfile.app
       network: host
-    networks:
-      - app_network
     env_file:
       - path: .env
     environment:
@@ -21,8 +19,3 @@ services:
       - ${APP_PORT}:${APP_PORT}
     volumes:
       - ${APP_CACHE_DIR}:/app_data_cache
-
-networks:
-  app_network:
-    name: app_services_network
-    driver: 'bridge'
