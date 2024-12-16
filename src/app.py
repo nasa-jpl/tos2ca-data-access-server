@@ -37,14 +37,6 @@ class App:
     def get_data(self, request):
         logging.info(f"Request: {request.url}")
 
-        # check for empty query
-        if len(request.query.keys()) == 0:
-            abort(400, "No query specified")
-
-        # check for status query
-        if request.query.get("status") is not None:
-            return ({"status": "running"}, "application/json")
-
         # check for params
         if request.query.get("files") is None:
             abort(400, "missing query parameter")

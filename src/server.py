@@ -1,4 +1,4 @@
-from bottle import Bottle, run, request, response
+from bottle import Bottle, run, request, response, abort
 from app import App
 
 from config import APP_CONFIG
@@ -23,6 +23,15 @@ def enable_cors():
 
 @bottle_app.route("/")
 def get_data():
+    # check for empty query
+    if len(request.query.keys()) == 0:
+        abort(400, "No query specified")
+
+    # check for status query
+    if request.query.get("status") is not None:
+        return ({"status": "running"}, "application/json")
+
+
     (data, output_format) = dataApp.get_data(request)
     response.content_type = output_format
     return data
