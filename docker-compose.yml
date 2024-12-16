@@ -17,24 +17,24 @@ services:
       - APP_LOG_LEVEL:${APP_LOG_LEVEL}
       - APP_PORT:${APP_PORT}
       - APP_LOCAL_ONLY:${APP_LOCAL_ONLY}
-    expose:
-      - ${APP_PORT}
+    ports:
+      - ${APP_PORT}:${APP_PORT}
     volumes:
       - ${APP_CACHE_DIR}:/app_data_cache
   
-  data_access_server_proxy:
-    build:
-      context: .
-      dockerfile: Dockerfile.proxy
-      network: host
-      args:
-        - NGINX_CONF=${APP_NGINX_CONF}
-    networks:
-      - app_network
-    env_file:
-      - path: .env
-    ports:
-      - ${APP_PORT}:80
+  # data_access_server_proxy:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.proxy
+  #     network: host
+  #     args:
+  #       - NGINX_CONF=${APP_NGINX_CONF}
+  #   networks:
+  #     - app_network
+  #   env_file:
+  #     - path: .env
+  #   ports:
+  #     - ${APP_PORT}:80
 
 networks:
   app_network:
