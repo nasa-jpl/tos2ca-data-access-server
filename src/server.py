@@ -23,13 +23,6 @@ def enable_cors():
 
 @bottle_app.route("/")
 def get_data():
-    data = {"status": "running"}
-    response.content_type = "application/json"
-    return data
-
-
-@bottle_app.route("/getVizData")
-def get_data():
     (data, output_format) = dataApp.get_data(request)
     response.content_type = output_format
     return data
