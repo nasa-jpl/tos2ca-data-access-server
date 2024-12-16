@@ -20,7 +20,7 @@ def enable_cors():
     )
 
 
-@bottle_app.route("/getData")
+@bottle_app.route("/getVizData/")
 def get_data():
     (data, output_format) = dataApp.get_data(request)
     response.content_type = output_format

@@ -194,6 +194,7 @@ def get_plot_data(
             f"{var_name}_std_dev",
         ]
 
+    # TODO - account for missing time steps 
     # build rows of stats data
     stats_rows = []
     for time in time_arr:
