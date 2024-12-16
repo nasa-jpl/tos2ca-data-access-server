@@ -6,6 +6,7 @@ from config import APP_CONFIG
 bottle_app = Bottle()
 dataApp = App()
 
+
 @bottle_app.hook("before_request")
 def strip_path():
     request.environ["PATH_INFO"] = request.environ["PATH_INFO"].rstrip("/")
@@ -18,6 +19,13 @@ def enable_cors():
     response.headers["Access-Control-Allow-Headers"] = (
         "Origin, Accept, Content-Type, X-Requested-With, X-CSRF-Token"
     )
+
+
+@bottle_app.route("/")
+def get_data():
+    data = {"status": "running"}
+    response.content_type = "application/json"
+    return data
 
 
 @bottle_app.route("/getVizData/")
