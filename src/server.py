@@ -28,7 +28,7 @@ def get_data():
     return data
 
 
-@bottle_app.route("/getVizData/")
+@bottle_app.route("/getVizData")
 def get_data():
     (data, output_format) = dataApp.get_data(request)
     response.content_type = output_format
