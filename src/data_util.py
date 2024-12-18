@@ -194,7 +194,7 @@ def get_plot_data(
             f"{var_name}_std_dev",
         ]
 
-    # TODO - account for missing time steps 
+    # TODO - account for missing time steps
     # build rows of stats data
     stats_rows = []
     for time in time_arr:
@@ -210,7 +210,10 @@ def get_plot_data(
                         entry["std_dev"],
                     ]
             stats_rows.append(row)
-    plotset["stats"] = {"columns": stats_columns, "rows": pd.DataFrame(stats_rows, columns=stats_columns).dropna()}
+    plotset["stats"] = {
+        "columns": stats_columns,
+        "rows": pd.DataFrame(stats_rows, columns=stats_columns).dropna(),
+    }
 
     mask_start_time = pytime.time()
 
@@ -232,6 +235,11 @@ def get_plot_data(
                     plotset["values"] == fill_value, plotset["values"] == expected_fill
                 )
             ),
+        )
+
+        # remove fill from stats
+        plotset["stats"].rows = (
+            plotset["stats"].rows[plotset["stats"].rows != expected_fill].dropna()
         )
 
     # index from the right because the number of value columns is variable
