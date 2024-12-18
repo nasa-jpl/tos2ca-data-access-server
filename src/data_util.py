@@ -241,7 +241,7 @@ def get_plot_data(
 
     # area is inclusive within [min_lon(x), min_lat(y), max_lon(x), max_lat(y)]
     # includes all points for all anomalies that intersect the bounds
-    if area:
+    if area is not None:
         if isinstance(area, list) and len(area) == 4:
             tmp_mask = mask.copy()
 
@@ -263,7 +263,7 @@ def get_plot_data(
             logging.warning(f"Improper bounding box format: {area}")
 
     # anomaly ids is a list of anomalies to include
-    if anomaly_ids and len(anomaly_ids) > 0:
+    if len(anomaly_ids) > 0:
         mask[:, anom_ind] = np.isin(plotset["values"][:, anom_ind], anomaly_ids)
         stats_mask = plotset["stats"]["rows"]["anom_id"].isin(anomaly_ids)
 
