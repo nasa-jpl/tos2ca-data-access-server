@@ -65,6 +65,11 @@ class App:
                 abort(400, "no files specified")
             local_files = download_files(file_list)
 
+            for fname in local_files:
+                if not os.path.isfile(fname):
+                    logging.error(f"Missing file: {fname}")
+                    abort(500, "Failed to collect data files")
+
             # compile all the data together
             data = data_util.get_plot_data(
                 file_list=local_files,
