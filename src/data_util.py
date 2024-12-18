@@ -238,8 +238,8 @@ def get_plot_data(
         )
 
         # remove fill from stats
-        plotset["stats"].rows = (
-            plotset["stats"].rows[plotset["stats"].rows != expected_fill].dropna()
+        plotset["stats"]["rows"] = (
+            plotset["stats"]["rows"][plotset["stats"]["rows"] != expected_fill].dropna()
         )
 
     # index from the right because the number of value columns is variable
