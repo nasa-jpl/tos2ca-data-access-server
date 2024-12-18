@@ -24,8 +24,12 @@ def _download_one_file(bucket: str, output: str, client: boto3.client, s3_file: 
         s3_file (str): S3 object name
     """
     logging.info(f"Downloading file: {s3_file}")
+
+    # clean filename for local caching
+    s3_file = s3_file.replace("s3://", "")
+    filename = os.path.basename(s3_file)
     
-    local_name = os.path.join(output, s3_file)
+    local_name = os.path.join(output, filename)
 
     # shortcut from cache
     logging.info(f"Looking for file: {local_name}")
