@@ -106,7 +106,7 @@ def get_plot_data(
     for dataset in datasets:
         (vset, sset) = dataset
         for varname in sset:
-            varset[varname] = {"stats": sset[varname], "units": vset["units"]}
+            varset[varname] = {"stats": sset[varname], "units": vset[varname]["units"]}
             var_times = list(sset[varname].keys())
             time_arr.extend(var_times)
             for var_time in var_times:
