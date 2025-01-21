@@ -164,7 +164,7 @@ def get_plot_data(
         plotset["stats"]["rows"] = plotset["stats"]["rows"][stats_mask]
 
     logging.info(
-        f"{file_list} Done. Elapsed time: {pytime.time() - p_start_time} seconds (masking: {pytime.time() - mask_start_time} seconds)"
+        f"{file_list} Done. Elapsed time: {round(pytime.time() - p_start_time, 4)} seconds (masking: {pytime.time() - mask_start_time} seconds)"
     )
     return plotset
 
@@ -193,6 +193,6 @@ def dump_plot_data(plotData):
     # splice the values into the return string
     json_str = plot_data_str[:-1] + "," + stats_sub_str + plot_data_str[-1:]
 
-    logging.info(f"dumped data to json: {pytime.time() - p_start_time} seconds")
+    logging.info(f"dumped data to json: {round(pytime.time() - p_start_time, 4)} seconds")
 
     return json_str
