@@ -121,7 +121,7 @@ def get_plot_data(
                 stats["rows"] = dataset[var_name]["values"]
             else:
                 stats_vals = dataset[var_name]["values"][:, 2:]
-                stats["rows"] = np.c_[dataset[var_name]["values"], stats_vals]
+                stats["rows"] = np.c_[stats["rows"], stats_vals]
 
     # format plot package
     plotset = {}
