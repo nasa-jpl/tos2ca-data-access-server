@@ -5,6 +5,7 @@ from collections import OrderedDict
 from functools import partial
 from multiprocessing import pool as mp_pool
 import pandas as pd
+import numpy as np
 from netCDF4 import Dataset
 import logging
 
@@ -18,7 +19,6 @@ def walktree(top):
 
 
 def get_data_from_file(filename, times=None):
-    varset = OrderedDict()
     statset = OrderedDict()
 
     if os.path.isfile(filename):
@@ -42,13 +42,18 @@ def get_data_from_file(filename, times=None):
                             continue
 
                         # collect stats info
+                        stats_row = []
                         try:
-                            summ_stats = {
-                                "min": float(variable.Min),
-                                "max": float(variable.Max),
-                                "mean": float(variable.Mean),
-                                "std_dev": float(variable.Std_dev),
-                            }
+                            stats_row = np.array(
+                                [
+                                    time,
+                                    id,
+                                    float(variable.Min),
+                                    float(variable.Max),
+                                    float(variable.Mean),
+                                    float(variable.Std_dev),
+                                ]
+                            )
                         except AttributeError:
                             logging.warning(
                                 f"Failed to retrieve statistics from: {filename}/{var_name}/{time}/{id}"
@@ -56,17 +61,14 @@ def get_data_from_file(filename, times=None):
 
                         # init accumulator
                         if var_name not in statset:
-                            varset[var_name] = {"units": units}
-                            statset[var_name] = {}
-                            statset[var_name][time] = {}
-                        else:
-                            if time not in statset[var_name]:
-                                statset[var_name][time] = {}
-                        statset[var_name][time][id] = {var_name: summ_stats}
+                            statset[var_name] = {"units": units, "values": []}
+                        statset[var_name]["values"].append(stats_row)
     else:
         logging.error(f"{filename} is not a file")
 
-    return (varset, statset)
+    for var_name in statset:
+        statset[var_name]["values"] = np.array(statset[var_name]["values"])
+    return statset
 
 
 def get_plot_data(
@@ -100,63 +102,43 @@ def get_plot_data(
             datasets.append(result)
 
     # collapse all the file contents into a single dict for ease
-    varset = OrderedDict()
-    time_arr = []
-    anom_id_arr = []
+    stats = {"columns": ["datetime", "anom_id"]}
+    var_meta = {}
+
+    # flatten variable results into a dict
     for dataset in datasets:
-        (vset, sset) = dataset
-        for varname in sset:
-            varset[varname] = {"stats": sset[varname], "units": vset[varname]["units"]}
-            var_times = list(sset[varname].keys())
-            time_arr.extend(var_times)
-            for var_time in var_times:
-                anom_id_arr.extend(list(sset[varname][var_time].keys()))
+        for var_name in dataset:
+            stats["columns"] = stats["columns"] + [
+                f"{var_name}_min",
+                f"{var_name}_max",
+                f"{var_name}_mean",
+                f"{var_name}_std_dev",
+            ]
 
-    time_arr = sorted(list(set(time_arr)))
-    anom_id_arr = sorted(list(set(anom_id_arr)))
+            var_meta[var_name] = {"units": dataset[var_name]["units"]}
 
-    # collect all the variable info
+            if "rows" not in stats:
+                stats["rows"] = dataset[var_name]["values"]
+            else:
+                stats_vals = dataset[var_name]["values"][:, 2:]
+                stats["rows"] = np.c_[dataset[var_name]["values"], stats_vals]
+
+    # format plot package
     plotset = {}
-    for var_name in varset:
+    for var_name in var_meta:
         if "values" not in plotset:
             plotset["title"] = to_title(var_name)
-            plotset["values"] = []
-            plotset["axis_labels"] = [f'{var_name} ({varset[var_name]["units"]})']
+            plotset["axis_labels"] = [f'{var_name} ({var_meta[var_name]["units"]})']
             plotset["var_list"] = [var_name]
+            plotset["values"] = []
         else:
             plotset["title"] = f'{plotset["title"]} x {to_title(var_name)}'
-            plotset["axis_labels"].append(f'{var_name} ({varset[var_name]["units"]})')
+            plotset["axis_labels"].append(f'{var_name} ({var_meta[var_name]["units"]})')
             plotset["var_list"].append(var_name)
 
-    # build list of column names
-    stats_columns = ["datetime", "anom_id"]
-    for var_name in varset:
-        stats_columns = stats_columns + [
-            f"{var_name}_min",
-            f"{var_name}_max",
-            f"{var_name}_mean",
-            f"{var_name}_std_dev",
-        ]
-
-    # build rows of stats data and add to the data package
-    stats_rows = []
-    for time in time_arr:
-        for anom_id in anom_id_arr:
-            row = [time, anom_id]
-            for var_name in varset:
-                if anom_id in varset[var_name]["stats"][time]:
-                    entry = varset[var_name]["stats"][time][anom_id][var_name]
-                    row = row + [
-                        entry["min"],
-                        entry["max"],
-                        entry["mean"],
-                        entry["std_dev"],
-                    ]
-            stats_rows.append(row)
-    plotset["stats"] = {
-        "columns": stats_columns,
-        "rows": pd.DataFrame(stats_rows, columns=stats_columns).dropna(),
-    }
+    # build dataframe of stats data and add to the data package
+    stats["rows"] = pd.DataFrame(stats["rows"], columns=stats["columns"]).dropna()
+    plotset["stats"] = stats
 
     mask_start_time = pytime.time()
 
@@ -169,9 +151,9 @@ def get_plot_data(
         expected_fill = -9999.0
 
         # remove fill from stats
-        plotset["stats"]["rows"] = (
-            plotset["stats"]["rows"][plotset["stats"]["rows"] != expected_fill].dropna()
-        )
+        plotset["stats"]["rows"] = plotset["stats"]["rows"][
+            plotset["stats"]["rows"] != expected_fill
+        ].dropna()
 
     # anomaly ids is a list of anomalies to include
     if len(anomaly_ids) > 0:
@@ -209,12 +191,7 @@ def dump_plot_data(plotData):
     )
 
     # splice the values into the return string
-    json_str = (
-        plot_data_str[:-1]
-        + ','
-        + stats_sub_str
-        + plot_data_str[-1:]
-    )
+    json_str = plot_data_str[:-1] + "," + stats_sub_str + plot_data_str[-1:]
 
     logging.info(f"dumped data to json: {pytime.time() - p_start_time} seconds")
 
