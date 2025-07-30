@@ -24,6 +24,6 @@ Simple Python application served with Bottle via an NGINX proxy. The application
 
 ### Alternate in case of no `docker compose` support
 
- - `./build.sh` - to build images and setup container network
- - `./start.sh` - to start the containers
- - `./stop.sh` - to stop the containers
+ - `./scripts.old/build.sh` - to build images and setup container network
+ - `./scripts.old/start.sh` - to start the containers
+ - `./scripts.old/stop.sh` - to stop the containers
