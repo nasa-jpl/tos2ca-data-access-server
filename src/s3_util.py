@@ -24,8 +24,12 @@ def _download_one_file(bucket: str, output: str, client: boto3.client, s3_file: 
         s3_file (str): S3 object name
     """
     logging.info(f"Downloading file: {s3_file}")
+
+    # clean filename for local caching
+    s3_key = s3_file.replace(f"s3://{bucket}/", "")
+    filename = os.path.basename(s3_key)
     
-    local_name = os.path.join(output, s3_file)
+    local_name = os.path.join(output, filename)
 
     # shortcut from cache
     logging.info(f"Looking for file: {local_name}")
@@ -34,7 +38,10 @@ def _download_one_file(bucket: str, output: str, client: boto3.client, s3_file: 
         _set_file_last_modified(local_name, datetime.datetime.now())
         return local_name
 
-    client.download_file(Bucket=bucket, Key=s3_file, Filename=local_name)
+    try:
+        client.download_file(Bucket=bucket, Key=s3_key, Filename=local_name)
+    except:
+        logging.error(f"Failed to download file: {s3_file}")
     return local_name
 
 

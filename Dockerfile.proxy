@@ -1,0 +1,5 @@
+FROM nginx:1.24.0
+
+ARG NGINX_CONF='nginx.conf'
+
+COPY ${NGINX_CONF} /etc/nginx/nginx.conf
