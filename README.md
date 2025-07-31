@@ -1,4 +1,10 @@
-# TOS2CA Data Access Server
+# Data Access Server
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.16053702.svg)](https://doi.org/10.5281/zenodo.16053702)
+
+[![Language](https://img.shields.io/badge/python-3.9-blue)](#) 
+
+The ``data-access-server`` library is part of the of the TOS2CA Project. For more information, visit the TOS2CA website at [https://nasa-jpl.github.io/tos2ca-documentation/](https://nasa-jpl.github.io/tos2ca-documentation/).
 
 Simple Python application served with Bottle via an NGINX proxy. The application provides and API to pull interpolated data files from S3 and repackage the contents for charting in a web-browser application. It relies on the following technologies:
 
