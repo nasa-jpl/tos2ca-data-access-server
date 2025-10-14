@@ -103,7 +103,7 @@ def get_plot_data(
                 datasets[var_name] = result[var_name]
 
     # collapse all the file contents into a single dict for ease
-    stats = None
+    dataDf = None
     var_meta = {}
 
     # flatten variable results into a dict
@@ -119,12 +119,16 @@ def get_plot_data(
             f"{var_name}_std_dev",
         ])
 
-        if stats is None:
-            stats = df
+        if dataDf is None:
+            dataDf = df
         else:
-            stats = stats.merge(df, on=["datetime", "anom_id"], how="outer")
+            dataDf = dataDf.merge(df, on=["datetime", "anom_id"], how="outer")
     
-    stats = stats.sort_values(by="datetime")
+    if dataDf is None:
+        logging.warning("No data within time bounds")
+        return None
+    
+    dataDf = dataDf.sort_values(by="datetime")
 
     # format plot package
     plotset = {}
@@ -139,31 +143,31 @@ def get_plot_data(
             plotset["axis_labels"].append(f'{var_name} ({var_meta[var_name]["units"]})')
             plotset["var_list"].append(var_name)
 
-    # build dataframe of stats data and add to the data package
-    plotset["stats"] = stats.dropna(how="all")
+    # drop empty rows
+    plotset["data"] = dataDf.dropna(how="all")
 
     mask_start_time = pytime.time()
 
     # Mask out plot values
-    stats_mask = None
+    data_mask = None
 
     # optionally remove rows that contain the fill value
     if remove_fill:
         # TODO - figure out why there are apparently multiple fill values?
         expected_fill = -9999.0
 
-        # remove fill from stats
-        plotset["stats"] = plotset["stats"][
-            plotset["stats"] != expected_fill
+        # remove fill from data
+        plotset["data"] = plotset["data"][
+            plotset["data"] != expected_fill
         ].dropna(how="all")
 
     # anomaly ids is a list of anomalies to include
     if len(anomaly_ids) > 0:
-        stats_mask = plotset["stats"]["anom_id"].isin(anomaly_ids)
+        data_mask = plotset["data"]["anom_id"].isin(anomaly_ids)
 
     # apply mask to values
-    if stats_mask is not None:
-        plotset["stats"] = plotset["stats"][stats_mask]
+    if data_mask is not None:
+        plotset["data"] = plotset["data"][data_mask]
 
     logging.info(
         f"{file_list} Done. Elapsed time: {round(pytime.time() - p_start_time, 4)} seconds (masking: {round(pytime.time() - mask_start_time, 4)} seconds)"
@@ -174,26 +178,30 @@ def get_plot_data(
 def dump_plot_data(plotData):
     p_start_time = pytime.time()
 
-    # remove values from data for serializing
-    stats_vals = plotData["stats"]
-    stats_headers = plotData["stats"].columns.to_list()
-    plotData.pop("stats", None)
+    if plotData is not None:
 
-    # get basic data string
-    plot_data_str = json.dumps(plotData)
+        # remove values from data for serializing
+        data_vals = plotData["data"]
+        data_headers = plotData["data"].columns.to_list()
+        plotData.pop("data", None)
 
-    # get data array as string
-    stats_vals_str = stats_vals.to_json(orient="values")
-    stats_sub_str = (
-        '"stats": {"rows":'
-        + stats_vals_str
-        + ',"columns":'
-        + json.dumps(stats_headers)
-        + "}"
-    )
+        # get basic data string
+        plot_data_str = json.dumps(plotData)
 
-    # splice the values into the return string
-    json_str = plot_data_str[:-1] + "," + stats_sub_str + plot_data_str[-1:]
+        # get data array as string
+        data_vals_str = data_vals.to_json(orient="values")
+        data_sub_str = (
+            '"data": {"rows":'
+            + data_vals_str
+            + ',"columns":'
+            + json.dumps(data_headers)
+            + "}"
+        )
+
+        # splice the values into the return string
+        json_str = plot_data_str[:-1] + "," + data_sub_str + plot_data_str[-1:]
+    else:
+        json_str = json.dumps({ 'error': True, 'msg': 'no data' })
 
     logging.info(
         f"dumped data to json: {round(pytime.time() - p_start_time, 4)} seconds"
